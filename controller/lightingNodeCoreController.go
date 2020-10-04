@@ -1,6 +1,52 @@
 package controller
 
-import ("fmt")
+import ("fmt"
+        "strconv"
+        "strings")
+
+
+type RGB struct {
+    r,g,b byte `validate:"required,gte=0,lte=255"`
+}
+
+// Implement the flag.Value interface
+func (s *RGB) String() string {
+    return fmt.Sprintf("r:%v g:%v b:%v", s.r, s.g, s.b)
+}
+
+func (s *RGB) Set(value string) (err error) {
+    strRgb := strings.Split(value, ",")
+    // validate RGB values
+    if len(strRgb) != 3 {
+        return fmt.Errorf("RGB must contain 3 comma seperated integers")
+    }
+    //r,g,b int
+    r, err := strconv.Atoi(strRgb[0])
+    g, err := strconv.Atoi(strRgb[1])
+    b, err := strconv.Atoi(strRgb[2])
+    if err != nil { return err }
+    s.r, s.b, s.g = byte(r), byte(g), byte(b)
+    return nil
+}
+
+
+type LncEffect struct {
+    mode, speed, direction, randomColor, numOfColors byte
+    Rgbs [2]RGB
+}
+
+var LncEffects = map[string]LncEffect {
+    "rainbow wave": LncEffect{mode:0x00, speed:0, direction:0, randomColor:1, numOfColors: 2},
+    "color shift": LncEffect{mode:0x01, speed:0, randomColor:1, numOfColors: 2},
+    "color pulse": LncEffect{mode:0x02, speed:0, randomColor:1, numOfColors: 2},
+    "color wave": LncEffect{mode:0x03, speed:0, direction:0, randomColor:1, numOfColors: 2},
+    "static": LncEffect{mode:0x04, numOfColors: 1},
+    "visor": LncEffect{mode:0x06, speed:1, randomColor:1, numOfColors: 2},
+    "marquee": LncEffect{mode:0x07, speed:1, numOfColors: 1},
+    "strobing": LncEffect{mode:0x08, speed:1, randomColor:1, numOfColors:0},
+    "sequential": LncEffect{mode:0x09, speed:1, direction:0, randomColor:1, numOfColors:1},
+    "rainbow": LncEffect{mode:0x0A, speed:1, direction:0, randomColor:1},
+}
 
 
 // led functions
@@ -87,7 +133,7 @@ func (c *LncController) SetColor(r,g,b byte) (err error) {
 	return
 }
 
-func (c *LncController) SetEffect(mode,r,g,b byte) (err error) {
+func (c *LncController) SetEffect(effect LncEffect) (err error) {
     /*
     0x00| 0x35
     0x01| Channel (0 or 1)
@@ -128,9 +174,22 @@ func (c *LncController) SetEffect(mode,r,g,b byte) (err error) {
     0x09| Sequential
     0x0A| Rainbow
     */
+    var c1,c2 RGB
+    if effect.randomColor == 0 {
+        switch effect.numOfColors {
+        case 1:
+            c1 = effect.Rgbs[0] 
+        case 2:
+            c1, c2 = effect.Rgbs[0], effect.Rgbs[1]
+        default:
+            return fmt.Errorf("effect cannot use RGB values %v")
+        }
+    }
 
-	_, err = c.usb.SendAndRecieve([]byte {0x35, c.channel, 0, c.ledCount, mode, 0 /*speed*/, 0 /*direction*/, 0, 0, r, g, b})
-	return
+	_, err = c.usb.SendAndRecieve([]byte {0x35, c.channel, 0, c.ledCount, 
+        effect.mode, effect.speed, effect.direction, effect.randomColor, 0, 
+        c1.r, c1.g, c1.b, c2.r, c2.g, c2.b})
+	return err
 }
 
 

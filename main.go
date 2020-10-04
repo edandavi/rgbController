@@ -3,57 +3,37 @@ package main
 import ("fmt"
         "flag"
         "strings"
-        "strconv"
         "os"
         //"time"
+        "gopkg.in/go-playground/validator.v9"
         "rgbController/controller")
         //"encoding/binary")
 
 
 
-
-
-
-
-
-// Create a new type for a list of Strings
-type rgbList []byte
-
-// Implement the flag.Value interface
-func (s *rgbList) String() string {
-    return fmt.Sprintf("%v", *s)
-}
-
-func (s *rgbList) Set(value string) error {
-    strRgb := strings.Split(value, ",")
-	*s = make([]byte, len(strRgb))
-	for i,v := range strRgb {
-		intVal, err := strconv.Atoi(v)
-		if err != nil {
-			return err
-		}
-		(*s)[i] = byte(intVal)
-	}
-    return nil
-}
-
 type CaseArgs struct {
-    rgb rgbList
     portState byte
+    effect controller.LncEffect
 }
 
 func parseArgs() (caseArgs CaseArgs, err error) {
 	// Subcommands
     caseCommand := flag.NewFlagSet("case", flag.ExitOnError)
+    
+
+    var rgb1,rgb2 controller.RGB
 
     // Use flag.Var to create a flag of our new flagType
     // Default value is the current value at countStringListPtr (currently a nil value)
-    caseCommand.Var(&(caseArgs.rgb), "RGB", "A comma seperated list of RGB values (0-255).")
+    caseCommand.Var(&rgb1, "RGB1", "A comma seperated list of RGB values (0-255).")
+    caseCommand.Var(&rgb2, "RGB2", "A comma seperated list of RGB values (0-255).")
     hwModePtr := caseCommand.Bool("hardware-mode", false, "Set changes to HW mode (saves after shutdown).")
+    effectPtr := caseCommand.String("effect", "chars",
+    "Set effect {Rainbow Wave|Color Shift|Color Pulse|Color Wave|Static|Visor|Marquee|strobing|Sequential|Rainbow}. (Required)")
+    
 
     /*
     countUniquePtr := caseCommand.Bool("hardware-mode", false, "Set changes to HW mode (saves after shutdown).")
-    countMetricPtr := countCommand.String("effect", "chars", "Set effect {static|rainbow|...}. (Required)")
     */
 	// Verify that a subcommand has been provided
     // os.Arg[0] is the main command
@@ -76,19 +56,23 @@ func parseArgs() (caseArgs CaseArgs, err error) {
     // Check which subcommand was Parsed using the FlagSet.Parsed() function. Handle each case accordingly.
     // FlagSet.Parse() will evaluate to false if no flags were parsed (i.e. the user did not provide any flags)
     if caseCommand.Parsed() {
-        // validate RGB values
-		if len(caseArgs.rgb) != 3 {
-			return caseArgs, fmt.Errorf("RGB must contain 3 comma seperated integers")
+        var ok bool
+        caseArgs.effect, ok = controller.LncEffects[strings.ToLower(*effectPtr)]
+        if !ok {
+            return caseArgs, fmt.Errorf("%v is not a supported effect", *effectPtr)
         }
-        for _,val := range caseArgs.rgb {
-            if val > 255 || val < 0 {
-                return caseArgs, fmt.Errorf("Invaid RGB value")
-            }
-        }
-        // assign port state
+        caseArgs.effect.Rgbs[0] = rgb1
+        caseArgs.effect.Rgbs[1] = rgb2
+
         caseArgs.portState = controller.SOFTWARE_MODE
         if *hwModePtr {
             caseArgs.portState = controller.HARDWARE_MODE
+        }
+
+        validate := validator.New()
+        errs := validate.Struct(&caseArgs)
+        if errs != nil {
+            return caseArgs, errs
         }
 	}
 	return
@@ -114,10 +98,12 @@ func main() {
 	}
 	defer contr.Close()
 
+    fmt.Println("effect: %v", caseArgs.effect)
+
     contr.Reset()
     contr.Begin()
     contr.SetPortState(caseArgs.portState)
-    contr.SetEffect(0x04, caseArgs.rgb[0], caseArgs.rgb[1], caseArgs.rgb[2])
+    contr.SetEffect(caseArgs.effect)
     contr.Commit()
     /*
     contr.Reset()
