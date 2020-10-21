@@ -3,14 +3,6 @@ package controller
 import ("fmt"
         "github.com/google/gousb")
 
-const (
-    PRODUCT gousb.ID = 0x0c1a
-    VENDOR gousb.ID = 0x1b1c
-
-    HARDWARE_MODE byte = 0x01
-    SOFTWARE_MODE byte = 0x02)
-
-
 
 type UsbController struct {
     ctx *gousb.Context

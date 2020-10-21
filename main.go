@@ -4,55 +4,43 @@ import ("fmt"
         "flag"
         "strings"
         "os"
-        //"time"
         "gopkg.in/go-playground/validator.v9"
         "rgbController/controller")
-        //"encoding/binary")
 
 
+
+func boolToByte(b bool) (byte) {
+    if b {
+        return 1
+    }
+    return 0
+}
 
 type CaseArgs struct {
     portState byte
     effect controller.LncEffect
 }
 
-func parseArgs() (caseArgs CaseArgs, err error) {
+func parseCaseArgs(args []string) (caseArgs CaseArgs, err error) {
 	// Subcommands
     caseCommand := flag.NewFlagSet("case", flag.ExitOnError)
-    
 
-    var rgb1,rgb2 controller.RGB
 
     // Use flag.Var to create a flag of our new flagType
     // Default value is the current value at countStringListPtr (currently a nil value)
+    var rgb1,rgb2 controller.RGB
     caseCommand.Var(&rgb1, "RGB1", "A comma seperated list of RGB values (0-255).")
     caseCommand.Var(&rgb2, "RGB2", "A comma seperated list of RGB values (0-255).")
+
     hwModePtr := caseCommand.Bool("hardware-mode", false, "Set changes to HW mode (saves after shutdown).")
+    directionPtr := caseCommand.Bool("change-direction", false, "Change direction of the effect.")
+    fixedColorPtr := caseCommand.Bool("fixed-color", false, "Set Fixed Color.")
+    speedPtr := caseCommand.Int("speed", 1, "Set speed of effect {0-fast|1|2-slow}.")
     effectPtr := caseCommand.String("effect", "chars",
-    "Set effect {Rainbow Wave|Color Shift|Color Pulse|Color Wave|Static|Visor|Marquee|strobing|Sequential|Rainbow}. (Required)")
+    "Set effect {Rainbow Wave|Color Shift|Color Pulse|Color Wave|Static|Visor|Marquee|Strobing|Sequential|Rainbow}. (Required)")
+
+    caseCommand.Parse(args)
     
-
-    /*
-    countUniquePtr := caseCommand.Bool("hardware-mode", false, "Set changes to HW mode (saves after shutdown).")
-    */
-	// Verify that a subcommand has been provided
-    // os.Arg[0] is the main command
-    // os.Arg[1] will be the subcommand
-    if len(os.Args) < 2 {
-        return caseArgs, fmt.Errorf("list or count subcommand is required")
-    }    
-
-	// Switch on the subcommand
-    // Parse the flags for appropriate FlagSet
-    // FlagSet.Parse() requires a set of arguments to parse as input
-    // os.Args[2:] will be all arguments starting after the subcommand at os.Args[1]
-    switch os.Args[1] {
-    case "case":
-        caseCommand.Parse(os.Args[2:])
-    default:
-        flag.PrintDefaults()
-        return caseArgs, fmt.Errorf("case|cpu command required")
-    }
     // Check which subcommand was Parsed using the FlagSet.Parsed() function. Handle each case accordingly.
     // FlagSet.Parse() will evaluate to false if no flags were parsed (i.e. the user did not provide any flags)
     if caseCommand.Parsed() {
@@ -61,8 +49,33 @@ func parseArgs() (caseArgs CaseArgs, err error) {
         if !ok {
             return caseArgs, fmt.Errorf("%v is not a supported effect", *effectPtr)
         }
-        caseArgs.effect.Rgbs[0] = rgb1
-        caseArgs.effect.Rgbs[1] = rgb2
+        caseCommand.Visit(func(f *flag.Flag) {
+            switch f.Name {
+            case "speed": 
+                err = caseArgs.effect.SetSpeed(byte(*speedPtr))
+            case "change-direction": 
+                err = caseArgs.effect.SetDirection(boolToByte(*directionPtr))
+            case "fixed-color": 
+                err = caseArgs.effect.SetRandomColor(boolToByte(!(*fixedColorPtr)))
+            }
+        })
+        if err != nil {
+            return caseArgs, err
+        }
+        
+        // RGB needs to be set after randomColor for validation
+        caseCommand.Visit(func(f *flag.Flag) {
+            switch f.Name {
+            case "RGB1": 
+                err = caseArgs.effect.SetRGB1(rgb1)
+            case "RGB2": 
+                err = caseArgs.effect.SetRGB2(rgb2)
+            }
+        })
+        if err != nil {
+            return caseArgs, err
+        }
+
 
         caseArgs.portState = controller.SOFTWARE_MODE
         if *hwModePtr {
@@ -79,6 +92,29 @@ func parseArgs() (caseArgs CaseArgs, err error) {
 }
 
 
+func parseArgs() (caseArgs CaseArgs, err error) {
+	// Verify that a subcommand has been provided
+    // os.Arg[0] is the main command
+    // os.Arg[1] will be the subcommand
+    if len(os.Args) < 2 {
+        return caseArgs, fmt.Errorf("list or count subcommand is required")
+    }    
+
+	// Switch on the subcommand
+    // Parse the flags for appropriate FlagSet
+    // FlagSet.Parse() requires a set of arguments to parse as input
+    // os.Args[2:] will be all arguments starting after the subcommand at os.Args[1]
+    switch os.Args[1] {
+    case "case":
+        return parseCaseArgs(os.Args[2:])
+    default:
+        flag.PrintDefaults()
+        return caseArgs, fmt.Errorf("case|cpu command required")
+    }
+    return
+}
+
+
 
 
 
@@ -90,7 +126,6 @@ func main() {
     }
     //fmt.Println(caseArgs)
     
-	//contr := UsbController{}
     contr := controller.LncController{}
 	if err:= contr.Open(); err != nil {
 		fmt.Println(err)
@@ -98,7 +133,7 @@ func main() {
 	}
 	defer contr.Close()
 
-    fmt.Println("effect: %v", caseArgs.effect)
+    fmt.Println("effect: ", caseArgs.effect)
 
     contr.Reset()
     contr.Begin()

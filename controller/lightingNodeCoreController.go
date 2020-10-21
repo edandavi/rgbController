@@ -2,7 +2,17 @@ package controller
 
 import ("fmt"
         "strconv"
-        "strings")
+        "strings"
+        "github.com/google/gousb")
+
+
+const (
+    PRODUCT gousb.ID = 0x0c1a
+    VENDOR gousb.ID = 0x1b1c
+
+    HARDWARE_MODE byte = 0x01
+    SOFTWARE_MODE byte = 0x02)
+
 
 
 type RGB struct {
@@ -32,20 +42,72 @@ func (s *RGB) Set(value string) (err error) {
 
 type LncEffect struct {
     mode, speed, direction, randomColor, numOfColors byte
-    Rgbs [2]RGB
+    rgbs [2]RGB
+}
+
+
+// these function are used to set cli arguments and treat unitiliazed values as non supported
+func (e* LncEffect) SetSpeed(speed byte) (err error) {
+    if e.speed == 0 {
+        return fmt.Errorf("Effect doesn't support speed change %v", *e)
+    }
+    if speed > 2 {
+        return fmt.Errorf("speed values are 0,1,2 got:%v", speed)
+    }
+    e.speed = speed
+    return nil
+}
+
+func (e* LncEffect) SetDirection(direction byte) (err error) {
+    if e.direction == 0 {
+        return fmt.Errorf("Effect doesn't support direction change %v", *e)
+    }
+    if direction > 1 {
+        return fmt.Errorf("speed values are 0,1 got:%v", direction)
+    }
+    e.direction = direction
+    return nil
+}
+
+func (e* LncEffect) SetRandomColor(randomColor byte) (err error) {
+    if e.randomColor  == 0 {
+        return fmt.Errorf("Effect doesn't support randomColor change %v", *e)
+    }
+    if randomColor > 1 {
+        return fmt.Errorf("randomColor values are 0,1 got:%v", randomColor)
+    }
+    e.randomColor = randomColor
+    return nil
+}
+
+// RGB need to be set after randomColor
+func (e* LncEffect) SetRGB1(rgb RGB) (err error) {
+    if e.randomColor == 1 || e.numOfColors == 0 {
+        return fmt.Errorf("Effect doesn't support 1 fixes colors %v", *e)
+    }
+    e.rgbs[0] = rgb
+    return nil
+}
+
+func (e* LncEffect) SetRGB2(rgb RGB) (err error) {
+    if e.randomColor == 1 || e.numOfColors != 2 {
+        return fmt.Errorf("Effect doesn't support 2 fixes colors %v", *e)
+    }
+    e.rgbs[1] = rgb
+    return nil
 }
 
 var LncEffects = map[string]LncEffect {
-    "rainbow wave": LncEffect{mode:0x00, speed:0, direction:0, randomColor:1, numOfColors: 2},
-    "color shift": LncEffect{mode:0x01, speed:0, randomColor:1, numOfColors: 2},
-    "color pulse": LncEffect{mode:0x02, speed:0, randomColor:1, numOfColors: 2},
-    "color wave": LncEffect{mode:0x03, speed:0, direction:0, randomColor:1, numOfColors: 2},
+    "rainbow wave": LncEffect{mode:0x00, speed:1, direction:1, randomColor:1, numOfColors: 2},
+    "color shift": LncEffect{mode:0x01, speed:1, randomColor:1, numOfColors: 2},
+    "color pulse": LncEffect{mode:0x02, speed:1, randomColor:1, numOfColors: 2},
+    "color wave": LncEffect{mode:0x03, speed:1, direction:1, randomColor:1, numOfColors: 2},
     "static": LncEffect{mode:0x04, numOfColors: 1},
     "visor": LncEffect{mode:0x06, speed:1, randomColor:1, numOfColors: 2},
     "marquee": LncEffect{mode:0x07, speed:1, numOfColors: 1},
-    "strobing": LncEffect{mode:0x08, speed:1, randomColor:1, numOfColors:0},
-    "sequential": LncEffect{mode:0x09, speed:1, direction:0, randomColor:1, numOfColors:1},
-    "rainbow": LncEffect{mode:0x0A, speed:1, direction:0, randomColor:1},
+    "strobing": LncEffect{mode:0x08, speed:1, randomColor:1},
+    "sequential": LncEffect{mode:0x09, speed:1, direction:1, randomColor:1, numOfColors:1},
+    "rainbow": LncEffect{mode:0x0A, speed:1, direction:1, randomColor:1},
 }
 
 
@@ -178,16 +240,16 @@ func (c *LncController) SetEffect(effect LncEffect) (err error) {
     if effect.randomColor == 0 {
         switch effect.numOfColors {
         case 1:
-            c1 = effect.Rgbs[0] 
+            c1 = effect.rgbs[0] 
         case 2:
-            c1, c2 = effect.Rgbs[0], effect.Rgbs[1]
+            c1, c2 = effect.rgbs[0], effect.rgbs[1]
         default:
             return fmt.Errorf("effect cannot use RGB values %v")
         }
     }
 
-	_, err = c.usb.SendAndRecieve([]byte {0x35, c.channel, 0, c.ledCount, 
-        effect.mode, effect.speed, effect.direction, effect.randomColor, 0, 
+	_, err = c.usb.SendAndRecieve([]byte {0x35, c.channel, 0, c.ledCount,
+        effect.mode, effect.speed, effect.direction, effect.randomColor, 0,
         c1.r, c1.g, c1.b, c2.r, c2.g, c2.b})
 	return err
 }
