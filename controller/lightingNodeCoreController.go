@@ -2,17 +2,18 @@ package controller
 
 import ("fmt"
         "strconv"
-        "strings"
-        "github.com/google/gousb")
+        "strings")
 
+
+var config = UsbConfig{ 
+    productId: 0x0c1a,
+    vendorId: 0x1b1c,
+    inEndpoint: 0x81,
+    outEndpoint: 0x01} 
 
 const (
-    PRODUCT gousb.ID = 0x0c1a
-    VENDOR gousb.ID = 0x1b1c
-
     HARDWARE_MODE byte = 0x01
     SOFTWARE_MODE byte = 0x02)
-
 
 
 type RGB struct {
@@ -124,7 +125,7 @@ func (c* LncController) Open() (err error) {
     c.numFans = 3
     c.ledCount = c.numFans * 8 //num of fans * num of leds per fan (true for SP120 RGB PRO fan)
     c.usb = new(UsbController)
-    return c.usb.Open()
+    return c.usb.Open(config)
 }
 
 func (c* LncController) Close() (err error) {

@@ -4,6 +4,14 @@ import ("fmt"
         "github.com/google/gousb")
 
 
+type UsbConfig struct { 
+    productId gousb.ID
+    vendorId gousb.ID
+    inEndpoint int
+    outEndpoint int
+}
+
+
 type UsbController struct {
     ctx *gousb.Context
     dev *gousb.Device
@@ -13,7 +21,7 @@ type UsbController struct {
     outEndpoint *gousb.OutEndpoint
 }
 
-func (c *UsbController) Open() (err error) {
+func (c *UsbController) Open(conf UsbConfig) (err error) {
     c.ctx = gousb.NewContext()
     defer func() {
         if err != nil {
@@ -21,16 +29,16 @@ func (c *UsbController) Open() (err error) {
         }
     }()
 
-    if c.dev, err = c.ctx.OpenDeviceWithVIDPID(VENDOR, PRODUCT); err != nil { return }
+    if c.dev, err = c.ctx.OpenDeviceWithVIDPID(conf.vendorId, conf.productId); err != nil { return }
     if c.dev == nil {
         c.Close()
-        return fmt.Errorf("No device found with product id: %v vendor id: %v\n", PRODUCT, VENDOR)
+        return fmt.Errorf("No device found with product id: %v vendor id: %v\n", conf.productId, conf.vendorId)
     }
 
     if err = c.dev.SetAutoDetach(true); err != nil { return }
     if c.intf, c.intfDone, err = c.dev.DefaultInterface(); err != nil { return }
-    if c.inEndpoint, err = c.intf.InEndpoint(0x81); err != nil { return }
-	if c.outEndpoint, err = c.intf.OutEndpoint(0x01); err != nil { return }
+    if c.inEndpoint, err = c.intf.InEndpoint(conf.inEndpoint); err != nil { return }
+	if c.outEndpoint, err = c.intf.OutEndpoint(conf.outEndpoint); err != nil { return }
 	return
 }
 
