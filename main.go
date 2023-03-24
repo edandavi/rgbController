@@ -119,27 +119,47 @@ func parseArgs() (caseArgs CaseArgs, err error) {
 
 
 func main() {
-    caseArgs, err := parseArgs()
-    if err != nil {
-        fmt.Println("Error parsing args ", err)
-        return
-    }
-    //fmt.Println(caseArgs)
-    
-    contr := controller.LncController{}
+
+    contr := controller.AmdController{}
 	if err:= contr.Open(); err != nil {
 		fmt.Println(err)
 		return
 	}
 	defer contr.Close()
+    //fmt.Println(contr.GetVersion())
+    fmt.Println(contr.Begin())
+    fmt.Println(contr.SetEffect(controller.AmdEffects["static"]))
+    fmt.Println(contr.AssignLedsToEffect(0, 0, 0))
+    fmt.Println(contr.Commit())
+    fmt.Println(contr.LedSave())
+    fmt.Println(contr.End())
+    
+    
 
-    fmt.Println("effect: ", caseArgs.effect)
+    // caseArgs, err := parseArgs()
+    // if err != nil {
+    //     fmt.Println("Error parsing args ", err)
+    //     return
+    // }
+    // //fmt.Println(caseArgs)
+    // 
+    // contr := controller.LncController{}
+	// if err:= contr.Open(); err != nil {
+	// 	fmt.Println(err)
+	// 	return
+	// }
+	// defer contr.Close()
 
-    contr.Reset()
-    contr.Begin()
-    contr.SetPortState(caseArgs.portState)
-    contr.SetEffect(caseArgs.effect)
-    contr.Commit()
+    // fmt.Println("effect: ", caseArgs.effect)
+
+    // contr.Reset()
+    // contr.Begin()
+    // contr.SetPortState(caseArgs.portState)
+    // contr.SetEffect(caseArgs.effect)
+    // contr.Commit()
+
+
+
     /*
     contr.Reset()
     contr.Begin()

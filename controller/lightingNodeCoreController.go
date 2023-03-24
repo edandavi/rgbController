@@ -1,44 +1,11 @@
 package controller
 
-import ("fmt"
-        "strconv"
-        "strings")
+import "fmt"
 
-
-var config = UsbConfig{ 
-    productId: 0x0c1a,
-    vendorId: 0x1b1c,
-    inEndpoint: 0x81,
-    outEndpoint: 0x01} 
 
 const (
     HARDWARE_MODE byte = 0x01
     SOFTWARE_MODE byte = 0x02)
-
-
-type RGB struct {
-    r,g,b byte `validate:"required,gte=0,lte=255"`
-}
-
-// Implement the flag.Value interface
-func (s *RGB) String() string {
-    return fmt.Sprintf("r:%v g:%v b:%v", s.r, s.g, s.b)
-}
-
-func (s *RGB) Set(value string) (err error) {
-    strRgb := strings.Split(value, ",")
-    // validate RGB values
-    if len(strRgb) != 3 {
-        return fmt.Errorf("RGB must contain 3 comma seperated integers")
-    }
-    //r,g,b int
-    r, err := strconv.Atoi(strRgb[0])
-    g, err := strconv.Atoi(strRgb[1])
-    b, err := strconv.Atoi(strRgb[2])
-    if err != nil { return err }
-    s.r, s.b, s.g = byte(r), byte(g), byte(b)
-    return nil
-}
 
 
 type LncEffect struct {
@@ -121,6 +88,13 @@ type LncController struct {
 }
 
 func (c* LncController) Open() (err error) {
+    var config = UsbConfig{ 
+        productId: 0x0c1a,
+        vendorId: 0x1b1c,
+        inEndpoint: 0x81,
+        outEndpoint: 0x01,
+        interfaceNum: 0,
+        interfaceAlternative: 0} 
     c.channel = 0 //corsair lighting node core has 1 channel
     c.numFans = 3
     c.ledCount = c.numFans * 8 //num of fans * num of leds per fan (true for SP120 RGB PRO fan)
